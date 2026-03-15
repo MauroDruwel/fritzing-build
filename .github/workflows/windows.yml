@@ -1,26 +1,27 @@
 name: Build Fritzing on Windows
 
 on:
+  push:
+    branches: [ master ]
   workflow_dispatch:
+
+env:
+  QT_VERSION: '6.5.3'
+  QT_ARCH: 'win64_msvc2019_64'
+  QT_MODULES: 'qt5compat'
+  QT_INSTALL_DIR: 'C:\Qt'
 
 jobs:
   build:
     runs-on: windows-2022
 
-    env:
-      VCPKG_DEFAULT_TRIPLET: x64-windows
-      # Pin VCPKG_ROOT to the runner's pre-installed copy to suppress
-      # the mismatch warning with the VS-bundled vcpkg path.
-      VCPKG_ROOT: C:\vcpkg
-
     steps:
-      # ── 0. Checkout this build repo (for patches) ────────────────────────
+      # ── 0. Checkout repositories ──────────────────────────────────────────
       - name: Checkout fritzing-build
         uses: actions/checkout@v4
         with:
           path: fritzing-build
 
-      # ── 1. Checkout Fritzing source ──────────────────────────────────────
       - name: Checkout fritzing-app
         uses: actions/checkout@v4
         with:
@@ -33,91 +34,245 @@ jobs:
           repository: fritzing/fritzing-parts
           path: fritzing-parts
 
-      # ── 1b. Apply build patches ──────────────────────────────────────────
-      - name: Patch libgit2detect.pri for vcpkg
-        working-directory: fritzing-app
-        run: git apply ../fritzing-build/patches/libgit2detect-vcpkg.patch
-        shell: bash
-
-      # ── 2. Setup MSVC 2022 64-bit environment ────────────────────────────
+      # ── 1. Setup MSVC 2022 environment ────────────────────────────────────
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64
 
-      # ── 2b. Re-pin VCPKG_ROOT ────────────────────────────────────────────
-      #        ilammy/msvc-dev-cmd runs vcvarsall.bat which overrides
-      #        VCPKG_ROOT to the VS-bundled path. Re-set it to the runner's
-      #        pre-installed copy where our packages are actually installed.
-      - name: Pin VCPKG_ROOT after MSVC setup
-        run: echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+      # ── 2. Install Qt via aqtinstall ──────────────────────────────────────
+      - name: Cache Qt installation
+        id: qt-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.QT_INSTALL_DIR }}
+          key: qt-${{ env.QT_VERSION }}-${{ env.QT_ARCH }}-${{ env.QT_MODULES }}
+
+      - name: Install Qt via aqtinstall
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: |
+          pip install aqtinstall
+          aqt install-qt windows desktop ${{ env.QT_VERSION }} ${{ env.QT_ARCH }} `
+            -m ${{ env.QT_MODULES }} `
+            --outputdir ${{ env.QT_INSTALL_DIR }}
         shell: pwsh
 
+      - name: Set Qt environment variables
+        run: |
+          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
+          echo "Qt6_DIR=$QtPath" >> $env:GITHUB_ENV
+          echo "$QtPath\bin" >> $env:GITHUB_PATH
+          echo "CMAKE_PREFIX_PATH=$QtPath" >> $env:GITHUB_ENV
+        shell: pwsh
 
-      # ── 3. Install Qt 6.5.3 (latest open-source 6.5.x; phoenix.pro allows 6.5.3–6.5.10)
-      #       Arch label for MSVC 2022 / 2019 64-bit is identical
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.5.3'
-          host: 'windows'
-          target: 'desktop'
-          arch: 'win64_msvc2019_64'
-          modules: 'qt5compat'
-          cache: true
-
-      # ── 4. Restore vcpkg cache ──────────────────────────────────────────
-      #       Restore the installed/ tree and binary cache from a previous
-      #       run so vcpkg install can skip already-built packages.
-      - name: Restore vcpkg cache
-        id: vcpkg-cache
-        uses: actions/cache/restore@v4
+      # ── 3. Cache built dependencies ──────────────────────────────────────
+      - name: Cache dependencies
+        id: deps-cache
+        uses: actions/cache@v4
         with:
           path: |
-            C:\vcpkg\installed
-            C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          key: vcpkg-x64-windows-${{ hashFiles('**/vcpkg-deps.txt') }}
-          restore-keys: |
-            vcpkg-x64-windows-
+            zlib
+            libgit2
+            quazip-1.4
+            quazip-${{ env.QT_VERSION }}-1.4intuisphere
+            Clipper1-6.4.2
+            boost_1_85_0
+            svgpp-1.3.1
+            ngspice-42
+          key: deps-manual-v1-${{ runner.os }}
 
-      # ── 5. Install C++ dependencies via vcpkg ───────────────────────────
-      - name: Install dependencies with vcpkg
+      # ── 4. Build ZLib ─────────────────────────────────────────────────────
+      - name: Download ZLib
+        if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
-          vcpkg install boost-filesystem boost-optional boost-assign `
-            libgit2 quazip openssl `
-            --triplet x64-windows
+          Invoke-WebRequest -Uri "https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz" `
+            -OutFile zlib.tar.gz
+          tar -xzf zlib.tar.gz
+          Rename-Item zlib-1.3 zlib
+          Remove-Item zlib.tar.gz
         shell: pwsh
 
-      # ── 5a. Save vcpkg cache immediately ─────────────────────────────────
-      #        Save right after install so the 3-hour build is never lost,
-      #        even if a later step (e.g. qmake) fails.
-      - name: Save vcpkg cache
-        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            C:\vcpkg\installed
-            C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          key: vcpkg-x64-windows-${{ hashFiles('**/vcpkg-deps.txt') }}
-
-      # ── 5b. Verify libgit2 is installed correctly ────────────────────────
-      - name: Verify vcpkg packages
+      - name: Build ZLib
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        working-directory: zlib
         run: |
-          echo "VCPKG_ROOT = $env:VCPKG_ROOT"
-          echo "--- libgit2 include ---"
-          Get-ChildItem "$env:VCPKG_ROOT\installed\x64-windows\include\git2*" -ErrorAction SilentlyContinue
-          echo "--- libgit2 lib ---"
-          Get-ChildItem "$env:VCPKG_ROOT\installed\x64-windows\lib\git2*" -ErrorAction SilentlyContinue
+          mkdir build
+          cd build
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+          nmake
+        shell: cmd
+
+      # ── 5. Build libgit2 ──────────────────────────────────────────────────
+      - name: Clone libgit2
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: git clone --depth 1 https://github.com/libgit2/libgit2.git libgit2
+        shell: bash
+
+      - name: Build libgit2
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        working-directory: libgit2
+        run: |
+          set ZLIB_ROOT=%GITHUB_WORKSPACE%\zlib
+          mkdir build64
+          cd build64
+          cmake -G "NMake Makefiles" ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=OFF ^
+            -DUSE_BUNDLED_ZLIB=OFF ^
+            -DZLIB_LIBRARY="%ZLIB_ROOT%\build\zs.lib" ^
+            -DZLIB_INCLUDE_DIR="%ZLIB_ROOT%" ^
+            ..
+          nmake
+          mkdir Release
+          copy git2.lib Release\
+        shell: cmd
+
+      # ── 6. Build QuaZip ───────────────────────────────────────────────────
+      - name: Download QuaZip
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/stachenov/quazip/archive/refs/tags/v1.4.tar.gz" `
+            -OutFile quazip.tar.gz
+          tar -xzf quazip.tar.gz
+          # GitHub archives extract as quazip-1.4 by default
+          Remove-Item quazip.tar.gz
         shell: pwsh
 
-      # ── 6. Configure and build Fritzing ─────────────────────────────────
+      - name: Build QuaZip
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        working-directory: quazip-1.4
+        run: |
+          $ZlibRoot = "$env:GITHUB_WORKSPACE\zlib"
+          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
+          New-Item -ItemType Directory -Force -Path build
+          Push-Location build
+          cmake -G "NMake Makefiles" `
+            -DCMAKE_PREFIX_PATH="$QtPath" `
+            -DZLIB_LIBRARY="$ZlibRoot\build\zs.lib" `
+            -DZLIB_INCLUDE_DIR="$ZlibRoot" `
+            -DCMAKE_BUILD_TYPE=Release ..
+          nmake
+          Pop-Location
+        shell: pwsh
+
+      - name: Setup QuaZip sibling directory
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          $QuazipSibling = "quazip-${{ env.QT_VERSION }}-1.4intuisphere"
+          New-Item -ItemType Directory -Force -Path "$QuazipSibling\lib"
+          New-Item -ItemType Directory -Force -Path "$QuazipSibling\include\QuaZip-Qt6-1.4\quazip"
+
+          # Copy built libraries
+          Copy-Item "quazip-1.4\build\quazip\quazip1-qt6.lib" "$QuazipSibling\lib\"
+          Copy-Item "quazip-1.4\build\quazip\quazip1-qt6.dll" "$QuazipSibling\lib\" -ErrorAction SilentlyContinue
+
+          # Copy header files
+          Copy-Item "quazip-1.4\quazip\*.h" "$QuazipSibling\include\QuaZip-Qt6-1.4\quazip\"
+        shell: pwsh
+
+      # ── 7. Setup Clipper ──────────────────────────────────────────────────
+      - name: Download and build Clipper
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://sourceforge.net/projects/polyclipping/files/clipper_ver6.4.2.zip/download" `
+            -OutFile clipper.zip -UserAgent "Mozilla/5.0"
+          Expand-Archive -Path clipper.zip -DestinationPath clipper-src
+          Remove-Item clipper.zip
+
+          # Create the expected directory structure
+          New-Item -ItemType Directory -Force -Path "Clipper1-6.4.2\include\polyclipping"
+          New-Item -ItemType Directory -Force -Path "Clipper1-6.4.2\lib"
+
+          # Find and copy source files
+          $cppDir = Get-ChildItem -Path "clipper-src" -Recurse -Filter "clipper.hpp" |
+                    Select-Object -First 1 -ExpandProperty DirectoryName
+          if ($cppDir) {
+            Copy-Item "$cppDir\clipper.hpp" "Clipper1-6.4.2\include\polyclipping\"
+            Copy-Item "$cppDir\clipper.cpp" "Clipper1-6.4.2\include\polyclipping\"
+          }
+
+          # Build clipper as a static library
+          Push-Location "Clipper1-6.4.2\include\polyclipping"
+          cl /c /EHsc /O2 /DNDEBUG clipper.cpp
+          lib /OUT:..\..\lib\polyclipping.lib clipper.obj
+          Remove-Item clipper.obj -ErrorAction SilentlyContinue
+          Pop-Location
+
+          Remove-Item "clipper-src" -Recurse -Force -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      # ── 8. Download header-only and pre-built dependencies ────────────────
+      - name: Download Boost
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz" `
+            -OutFile boost.tar.gz
+          tar -xzf boost.tar.gz
+          Remove-Item boost.tar.gz
+        shell: pwsh
+
+      - name: Download SVG++
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/svgpp/svgpp/archive/refs/tags/v1.3.1.tar.gz" `
+            -OutFile svgpp.tar.gz
+          tar -xzf svgpp.tar.gz
+          Remove-Item svgpp.tar.gz
+        shell: pwsh
+
+      - name: Download ngspice
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://sourceforge.net/projects/ngspice/files/ng-spice-rework/old-releases/42/ngspice-42_dll_64.7z/download" `
+            -OutFile ngspice.7z -UserAgent "Mozilla/5.0"
+          7z x ngspice.7z -ongspice-extract
+          # Move contents to expected location
+          if (Test-Path "ngspice-extract\Spice64_dll") {
+            Move-Item "ngspice-extract\Spice64_dll" "ngspice-42"
+          } elseif (Test-Path "ngspice-extract\ngspice-42") {
+            Move-Item "ngspice-extract\ngspice-42" .
+          } else {
+            Rename-Item "ngspice-extract" "ngspice-42"
+          }
+          Remove-Item ngspice.7z -ErrorAction SilentlyContinue
+          Remove-Item ngspice-extract -Recurse -Force -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      # ── 9. Verify directory structure ─────────────────────────────────────
+      - name: Verify dependency layout
+        run: |
+          echo "=== Directory Structure ==="
+          echo "--- libgit2 ---"
+          Get-ChildItem "libgit2\include\git2.h" -ErrorAction SilentlyContinue
+          Get-ChildItem "libgit2\build64\Release\git2.lib" -ErrorAction SilentlyContinue
+          echo "--- QuaZip ---"
+          $qz = "quazip-${{ env.QT_VERSION }}-1.4intuisphere"
+          Get-ChildItem "$qz\lib\*" -ErrorAction SilentlyContinue
+          Get-ChildItem "$qz\include\QuaZip-Qt6-1.4\quazip\*.h" -ErrorAction SilentlyContinue | Select-Object -First 3
+          echo "--- Clipper ---"
+          Get-ChildItem "Clipper1-6.4.2\include\polyclipping\*" -ErrorAction SilentlyContinue
+          Get-ChildItem "Clipper1-6.4.2\lib\*" -ErrorAction SilentlyContinue
+          echo "--- Boost ---"
+          Test-Path "boost_1_85_0\boost\version.hpp"
+          echo "--- SVG++ ---"
+          Test-Path "svgpp-1.3.1\include"
+          echo "--- ngspice ---"
+          Test-Path "ngspice-42\include"
+        shell: pwsh
+
+      # ── 10. Configure Fritzing (qmake) ───────────────────────────────────
+      - name: Clean qmake cache
+        working-directory: fritzing-app
+        run: |
+          if (Test-Path .qmake.cache) { Remove-Item .qmake.cache }
+          if (Test-Path .qmake.stash) { Remove-Item .qmake.stash }
+        shell: pwsh
+
       - name: Configure Fritzing (qmake)
         working-directory: fritzing-app
         run: |
-          $VcpkgInstalled = "$env:VCPKG_ROOT\installed\x64-windows"
-          qmake phoenix.pro `
-            "BOOST_PATH=$VcpkgInstalled\include" `
-            "LIBGIT2_PATH=$VcpkgInstalled"
+          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
+          & "$QtPath\bin\qmake.exe" phoenix.pro
         shell: pwsh
 
       - name: Build Fritzing (nmake)
@@ -125,13 +280,13 @@ jobs:
         run: nmake release
         shell: cmd
 
-      # ── 7. Deploy Qt runtime DLLs next to the executable ────────────────
+      # ── 11. Deploy Qt runtime DLLs ───────────────────────────────────────
       - name: Deploy Qt (windeployqt)
         working-directory: fritzing-app/release
         run: windeployqt Fritzing.exe
         shell: cmd
 
-      # ── 8. Upload the finished build as a downloadable artifact ─────────
+      # ── 12. Upload build artifact ────────────────────────────────────────
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
