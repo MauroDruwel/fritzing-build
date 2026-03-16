@@ -271,7 +271,16 @@ jobs:
         working-directory: fritzing-app
         run: |
           $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
-          & "$QtPath\bin\qmake.exe" phoenix.pro
+          $ZlibLib = "$env:GITHUB_WORKSPACE\zlib\build"
+          # Static libgit2 needs its transitive deps linked into the final executable:
+          #   zlibstatic  – zlib symbols (deflate, inflate, crc32 …)
+          #   advapi32    – registry, crypto, SID/token APIs
+          #   winhttp     – WinHTTP transport
+          #   crypt32     – certificate APIs
+          #   ole32       – COM (CoInitializeEx …)
+          #   rpcrt4      – UuidCreate
+          & "$QtPath\bin\qmake.exe" phoenix.pro `
+            "LIBS+=-L$ZlibLib -lzlibstatic -ladvapi32 -lwinhttp -lcrypt32 -lole32 -lrpcrt4"
         shell: pwsh
 
       - name: Build Fritzing (nmake)
