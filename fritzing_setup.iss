@@ -15,7 +15,6 @@ AppVerName=Fritzing {#MyAppVersion}
 AppPublisher=Fritzing
 AppPublisherURL=https://fritzing.org
 AppSupportURL=https://forum.fritzing.org
-AppURL=https://fritzing.org
 DefaultDirName={autopf}\Fritzing
 DefaultGroupName=Fritzing
 LicenseFile=fritzing-app\LICENSE.GPL2
