@@ -313,7 +313,14 @@ jobs:
       # ── 14. Compile Online Installer (Slim) ──────────────────────────────
       - name: Zip fritzing-parts for Online Installer
         run: |
-          Compress-Archive -Path "fritzing-parts" -DestinationPath "fritzing-parts.zip"
+          # Clone from local checkout → guarantees a proper .git, no re-download
+          git clone --no-hardlinks fritzing-parts fritzing-parts-zip/fritzing-parts
+          # Fix remote URL: local clone points origin to CI-local path; must point to GitHub
+          git -C fritzing-parts-zip/fritzing-parts remote set-url origin https://github.com/fritzing/fritzing-parts.git
+          Push-Location fritzing-parts-zip
+          7z a -tzip ..\fritzing-parts.zip fritzing-parts
+          Pop-Location
+          Remove-Item fritzing-parts-zip -Recurse -Force
         shell: pwsh
 
       - name: Compile Online Setup (Downloads parts)
@@ -325,17 +332,21 @@ jobs:
         shell: pwsh
 
       # ── 15. Bundle fritzing-parts for Offline usage ──────────────────────
-      - name: Copy fritzing-parts into release64
+      - name: Clone fritzing-parts into release64
         run: |
-          # Copy the full database (including .git) into release64 for the Offline Zip/Installer
-          Copy-Item "fritzing-parts" "release64\" -Recurse -Force
-        shell: pwsh
+          # Clone from local checkout → guarantees a proper .git, no re-download
+          git clone --no-hardlinks fritzing-parts release64/fritzing-parts
+          # Fix remote URL: local clone points origin to CI-local path; must point to GitHub
+          git -C release64/fritzing-parts remote set-url origin https://github.com/fritzing/fritzing-parts.git
+        shell: bash
 
       # ── 16. Compile Portable ZIP ─────────────────────────────────────────
       - name: Compress Portable ZIP
         run: |
           $zipName = "Fritzing-$env:FRITZING_VER-Portable-Windows-x64.zip"
-          Compress-Archive -Path "release64\*" -DestinationPath $zipName
+          Push-Location release64
+          7z a -tzip "..\$zipName" *
+          Pop-Location
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
@@ -345,14 +356,6 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=0 "fritzing_setup.iss"
           echo "OFFLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OfflineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
-
-      # ── 18. Upload build artifact ────────────────────────────────────────
-      # - name: Upload build artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Fritzing-${{ env.FRITZING_VER }}-Windows-x64
-      #     path: release64/
-      #     retention-days: 14
 
       # ── 19. Create GitHub Release ────────────────────────────────────────
       - name: Create GitHub Release
