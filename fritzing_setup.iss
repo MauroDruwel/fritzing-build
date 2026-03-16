@@ -1,10 +1,24 @@
+; ──────────────────────────────────────────────────────────────────────────────
+; Fritzing Installer Script for Inno Setup 6.1+
+; Supports two modes via /dOnlineInstaller="1" or /dOnlineInstaller="0":
+;   Online  – lightweight setup, downloads fritzing-parts during install
+;   Offline – bundles fritzing-parts inside the setup executable
+; ──────────────────────────────────────────────────────────────────────────────
+
 [Setup]
+; NOTE: AppId uniquely identifies this application. Do not use the same AppId
+; in installers for other applications.
+AppId={{94D3371B-D83D-4171-BD52-8ED3D3957E99}
 AppName=Fritzing
 AppVersion={#MyAppVersion}
+AppVerName=Fritzing {#MyAppVersion}
 AppPublisher=Fritzing
+AppPublisherURL=https://fritzing.org
+AppSupportURL=https://forum.fritzing.org
 AppURL=https://fritzing.org
 DefaultDirName={autopf}\Fritzing
 DefaultGroupName=Fritzing
+LicenseFile=fritzing-app\LICENSE.GPL2
 OutputDir=.\
 #if defined(OnlineInstaller) && OnlineInstaller == "1"
 OutputBaseFilename=Fritzing-{#MyAppVersion}-OnlineSetup-Windows-x64
@@ -13,33 +27,48 @@ OutputBaseFilename=Fritzing-{#MyAppVersion}-OfflineSetup-Windows-x64
 #endif
 Compression=lzma2
 SolidCompression=yes
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
+PrivilegesRequiredOverridesAllowed=dialog
 UninstallDisplayIcon={app}\Fritzing.exe
 ChangesAssociations=yes
+WizardStyle=modern
+SetupLogging=yes
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "associatefzz"; Description: "Associate .fzz and .fzpz files with Fritzing"; GroupDescription: "File associations:"; Flags: unchecked
 
 [Registry]
-Root: HKCR; Subkey: ".fzz"; ValueType: string; ValueName: ""; ValueData: "FritzingProject"; Flags: uninsdeletevalue; Tasks: associatefzz
-Root: HKCR; Subkey: ".fzpz"; ValueType: string; ValueName: ""; ValueData: "FritzingPart"; Flags: uninsdeletevalue; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingProject"; ValueType: string; ValueName: ""; ValueData: "Fritzing Sketch"; Flags: uninsdeletekey; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingProject\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Fritzing.exe,0"; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingProject\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Fritzing.exe"" ""%1"""; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingPart"; ValueType: string; ValueName: ""; ValueData: "Fritzing Component Part"; Flags: uninsdeletekey; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingPart\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Fritzing.exe,0"; Tasks: associatefzz
-Root: HKCR; Subkey: "FritzingPart\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Fritzing.exe"" ""%1"""; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\.fzz"; ValueType: string; ValueName: ""; ValueData: "FritzingProject"; Flags: uninsdeletevalue; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\.fzpz"; ValueType: string; ValueName: ""; ValueData: "FritzingPart"; Flags: uninsdeletevalue; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingProject"; ValueType: string; ValueName: ""; ValueData: "Fritzing Sketch"; Flags: uninsdeletekey; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingProject\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Fritzing.exe,0"; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingProject\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Fritzing.exe"" ""%1"""; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingPart"; ValueType: string; ValueName: ""; ValueData: "Fritzing Component Part"; Flags: uninsdeletekey; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingPart\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Fritzing.exe,0"; Tasks: associatefzz
+Root: HKA; Subkey: "Software\Classes\FritzingPart\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Fritzing.exe"" ""%1"""; Tasks: associatefzz
 
 [Files]
-; Base files (takes whatever is inside release64. For Online, it's missing fritzing-parts. For Offline, it contains fritzing-parts)
+; Bundle everything inside release64 (Online = no parts, Offline = with parts)
 Source: "release64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Fritzing"; Filename: "{app}\Fritzing.exe"
 Name: "{autodesktop}\Fritzing"; Filename: "{app}\Fritzing.exe"; Tasks: desktopicon
 
+[Run]
+Filename: "{app}\Fritzing.exe"; Description: "{cm:LaunchProgram,Fritzing}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Clean up the fritzing-parts folder (extracted post-install by the online installer,
+; so Inno Setup's uninstaller does not track those files automatically)
+Type: filesandirs; Name: "{app}\fritzing-parts"
+
+; ──────────────────────────────────────────────────────────────────────────────
+; Online Installer: download and extract fritzing-parts during installation
+; ──────────────────────────────────────────────────────────────────────────────
 #if defined(OnlineInstaller) && OnlineInstaller == "1"
 [Code]
 var
@@ -47,51 +76,78 @@ var
 
 procedure InitializeWizard;
 begin
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
+  DownloadPage := CreateDownloadPage(
+    SetupMessage(msgWizardPreparing),
+    SetupMessage(msgPreparingDesc),
+    nil);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
+  Result := True;
   if CurPageID = wpReady then begin
     DownloadPage.Clear;
-    DownloadPage.Add('https://github.com/fritzing/fritzing-parts/archive/refs/heads/master.zip', 'fritzing-parts.zip', '');
+    DownloadPage.Add(
+      'https://github.com/fritzing/fritzing-parts/archive/refs/heads/master.zip',
+      'fritzing-parts.zip', '');
     DownloadPage.Show;
     try
       try
         DownloadPage.Download;
       except
         if DownloadPage.AbortedByUser then
-          Log('Aborted by user.')
+          Log('Download aborted by user.')
         else
-          MsgBox('Parts database download failed: ' + GetExceptionMessage, mbError, MB_OK);
+          SuppressibleMsgBox(
+            'Failed to download the parts database:' + #13#10 + GetExceptionMessage + #13#10#13#10 +
+            'Fritzing will still install but may not function correctly without the parts library.',
+            mbCriticalError, MB_OK, IDOK);
         Result := False;
-        exit;
       end;
     finally
-      DownloadPage.Hide; // Hide the download page when done
+      DownloadPage.Hide;
     end;
   end;
-  Result := True;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  ZipPath: String;
 begin
   if CurStep = ssPostInstall then
   begin
+    ZipPath := ExpandConstant('{tmp}\fritzing-parts.zip');
+
+    // Only attempt extraction if the download actually succeeded
+    if not FileExists(ZipPath) then begin
+      Log('fritzing-parts.zip not found in temp; skipping extraction.');
+      exit;
+    end;
+
     WizardForm.StatusLabel.Caption := 'Extracting Fritzing Parts database... (this may take a minute)';
     WizardForm.ProgressGauge.Style := npbstMarquee;
-    
-    // Use native Windows 10/11 tar to quickly extract the downloaded zip file into {app}
-    if Exec(ExpandConstant('{cmd}'), '/c tar.exe -xf "' + ExpandConstant('{tmp}\fritzing-parts.zip') + '" -C "' + ExpandConstant('{app}') + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+
+    // Use native Windows 10/11 tar.exe for fast extraction
+    if Exec(
+      ExpandConstant('{cmd}'),
+      '/c tar.exe -xf "' + ZipPath + '" -C "' + ExpandConstant('{app}') + '"',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
-      // GitHub zip names the extracted folder 'fritzing-parts-master', rename it to what Fritzing expects
-      RenameFile(ExpandConstant('{app}\fritzing-parts-master'), ExpandConstant('{app}\fritzing-parts'));
+      // GitHub's archive names the folder 'fritzing-parts-master'; rename to 'fritzing-parts'
+      RenameFile(
+        ExpandConstant('{app}\fritzing-parts-master'),
+        ExpandConstant('{app}\fritzing-parts'));
+      Log('fritzing-parts extracted and renamed successfully.');
     end else begin
-      MsgBox('Failed to extract parts database. (tar exit code: ' + IntToStr(ResultCode) + ')', mbError, MB_OK);
+      Log('tar.exe failed with exit code: ' + IntToStr(ResultCode));
+      SuppressibleMsgBox(
+        'Failed to extract the parts database (tar exit code: ' + IntToStr(ResultCode) + ').' + #13#10 +
+        'You can manually download and extract it from:' + #13#10 +
+        'https://github.com/fritzing/fritzing-parts',
+        mbError, MB_OK, IDOK);
     end;
-    
+
     WizardForm.ProgressGauge.Style := npbstNormal;
   end;
 end;
