@@ -63,7 +63,7 @@ Filename: "{app}\Fritzing.exe"; Description: "{cm:LaunchProgram,Fritzing}"; Flag
 [UninstallDelete]
 ; Clean up the fritzing-parts folder (extracted post-install by the online installer,
 ; so Inno Setup's uninstaller does not track those files automatically)
-Type: filesandirs; Name: "{app}\fritzing-parts"
+Type: filesandordirs; Name: "{app}\fritzing-parts"
 
 ; ──────────────────────────────────────────────────────────────────────────────
 ; Online Installer: download and extract fritzing-parts during installation
