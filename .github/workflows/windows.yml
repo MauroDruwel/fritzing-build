@@ -277,7 +277,14 @@ jobs:
         run: windeployqt Fritzing.exe
         shell: cmd
 
-      # ── 12. Upload build artifact ────────────────────────────────────────
+      # ── 12. Copy Third-Party DLLs ────────────────────────────────────────
+      - name: Copy third-party DLLs
+        run: |
+          Copy-Item "quazip-${{ env.QT_VERSION }}-1.4intuisphere\lib\*.dll" "release64\" -ErrorAction SilentlyContinue
+          Copy-Item "ngspice-42\*.dll" "release64\" -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      # ── 13. Upload build artifact ────────────────────────────────────────
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
