@@ -361,4 +361,4 @@ jobs:
             ${{ env.ONLINE_SETUP_FILE }}
             ${{ env.OFFLINE_SETUP_FILE }}
           draft: true
-          generate_release_notes: false
+          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
