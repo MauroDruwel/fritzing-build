@@ -8,7 +8,6 @@ on:
 env:
   QT_VERSION: '6.5.3'
   QT_ARCH: 'win64_msvc2019_64'
-  QT_MODULES: 'qt5compat'
   QT_INSTALL_DIR: 'C:\Qt'
 
 jobs:
@@ -46,14 +45,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.QT_INSTALL_DIR }}
-          key: qt-${{ env.QT_VERSION }}-${{ env.QT_ARCH }}-${{ env.QT_MODULES }}
+          key: qt-${{ env.QT_VERSION }}-${{ env.QT_ARCH }}-all
 
       - name: Install Qt via aqtinstall
         if: steps.qt-cache.outputs.cache-hit != 'true'
         run: |
           pip install aqtinstall
           aqt install-qt windows desktop ${{ env.QT_VERSION }} ${{ env.QT_ARCH }} `
-            -m ${{ env.QT_MODULES }} `
+            -m all `
             --outputdir ${{ env.QT_INSTALL_DIR }}
         shell: pwsh
 
