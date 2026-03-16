@@ -8,7 +8,6 @@ on:
 env:
   QT_VERSION: '6.5.3'
   QT_ARCH: 'win64_msvc2019_64'
-  QT_INSTALL_DIR: 'C:\Qt'
 
 jobs:
   build:
@@ -39,30 +38,16 @@ jobs:
         with:
           arch: amd64
 
-      # ── 2. Install Qt via aqtinstall ──────────────────────────────────────
-      - name: Cache Qt installation
-        id: qt-cache
-        uses: actions/cache@v4
+      # ── 2. Install Qt ────────────────────────────────────────────────────
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
         with:
-          path: ${{ env.QT_INSTALL_DIR }}
-          key: qt-${{ env.QT_VERSION }}-${{ env.QT_ARCH }}-all
-
-      - name: Install Qt via aqtinstall
-        if: steps.qt-cache.outputs.cache-hit != 'true'
-        run: |
-          pip install aqtinstall
-          aqt install-qt windows desktop ${{ env.QT_VERSION }} ${{ env.QT_ARCH }} `
-            -m all `
-            --outputdir ${{ env.QT_INSTALL_DIR }}
-        shell: pwsh
-
-      - name: Set Qt environment variables
-        run: |
-          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
-          echo "Qt6_DIR=$QtPath" >> $env:GITHUB_ENV
-          echo "$QtPath\bin" >> $env:GITHUB_PATH
-          echo "CMAKE_PREFIX_PATH=$QtPath" >> $env:GITHUB_ENV
-        shell: pwsh
+          version: ${{ env.QT_VERSION }}
+          host: 'windows'
+          target: 'desktop'
+          arch: ${{ env.QT_ARCH }}
+          modules: 'qtserialport qt5compat'
+          cache: true
 
       # ── 3. Cache built dependencies ──────────────────────────────────────
       - name: Cache dependencies
@@ -144,11 +129,9 @@ jobs:
         working-directory: quazip-1.4
         run: |
           $ZlibRoot = "$env:GITHUB_WORKSPACE\zlib"
-          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
           New-Item -ItemType Directory -Force -Path build
           Push-Location build
           cmake -G "NMake Makefiles" `
-            -DCMAKE_PREFIX_PATH="$QtPath" `
             -DZLIB_LIBRARY="$ZlibRoot\build\zlibstatic.lib" `
             -DZLIB_INCLUDE_DIR="$ZlibRoot" `
             -DCMAKE_BUILD_TYPE=Release ..
@@ -271,7 +254,6 @@ jobs:
       - name: Configure Fritzing (qmake)
         working-directory: fritzing-app
         run: |
-          $QtPath = "${{ env.QT_INSTALL_DIR }}\${{ env.QT_VERSION }}\msvc2019_64"
           $ZlibLib = "$env:GITHUB_WORKSPACE\zlib\build"
           # Static libgit2 needs its transitive deps linked into the final executable:
           #   zlibstatic  – zlib symbols (deflate, inflate, crc32 …)
@@ -280,7 +262,7 @@ jobs:
           #   crypt32     – certificate APIs
           #   ole32       – COM (CoInitializeEx …)
           #   rpcrt4      – UuidCreate
-          & "$QtPath\bin\qmake.exe" phoenix.pro `
+          qmake phoenix.pro `
             "LIBS+=-L$ZlibLib -lzlibstatic -ladvapi32 -lwinhttp -lcrypt32 -lole32 -lrpcrt4"
         shell: pwsh
 
