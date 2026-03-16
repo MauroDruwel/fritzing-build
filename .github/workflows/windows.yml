@@ -277,11 +277,19 @@ jobs:
         run: windeployqt Fritzing.exe
         shell: cmd
 
-      # ── 12. Copy Third-Party DLLs ────────────────────────────────────────
-      - name: Copy third-party DLLs
+      # ── 12. Copy Third-Party DLLs & Runtime Data ──────────────────────────
+      - name: Copy third-party DLLs and data folders
         run: |
+          # Copy extra DLLs
           Copy-Item "quazip-${{ env.QT_VERSION }}-1.4intuisphere\lib\*.dll" "release64\" -ErrorAction SilentlyContinue
           Copy-Item "ngspice-42\*.dll" "release64\" -ErrorAction SilentlyContinue
+          Copy-Item "$env:QT_ROOT_DIR\bin\Qt6Core5Compat.dll" "release64\" -ErrorAction SilentlyContinue
+
+          # Fritzing needs these folders alongside the .exe to run
+          Copy-Item "fritzing-parts" "release64\" -Recurse -Force
+          Copy-Item "fritzing-app\help" "release64\" -Recurse -Force
+          Copy-Item "fritzing-app\sketches" "release64\" -Recurse -Force
+          Copy-Item "fritzing-app\translations" "release64\" -Recurse -Force
         shell: pwsh
 
       # ── 13. Upload build artifact ────────────────────────────────────────
