@@ -6,7 +6,7 @@ AppURL=https://fritzing.org
 DefaultDirName={autopf}\Fritzing
 DefaultGroupName=Fritzing
 OutputDir=.\
-#if defined(OnlineInstaller) && OnlineInstaller == 1
+#if defined(OnlineInstaller) && OnlineInstaller == "1"
 OutputBaseFilename=Fritzing-{#MyAppVersion}-OnlineSetup-Windows-x64
 #else
 OutputBaseFilename=Fritzing-{#MyAppVersion}-OfflineSetup-Windows-x64
@@ -40,7 +40,7 @@ Source: "release64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cre
 Name: "{group}\Fritzing"; Filename: "{app}\Fritzing.exe"
 Name: "{autodesktop}\Fritzing"; Filename: "{app}\Fritzing.exe"; Tasks: desktopicon
 
-#if defined(OnlineInstaller) && OnlineInstaller == 1
+#if defined(OnlineInstaller) && OnlineInstaller == "1"
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
