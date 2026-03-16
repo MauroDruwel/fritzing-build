@@ -118,6 +118,7 @@ jobs:
           cmake -G "NMake Makefiles" ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DBUILD_SHARED_LIBS=OFF ^
+            -DBUILD_TESTS=OFF ^
             -DUSE_BUNDLED_ZLIB=OFF ^
             -DZLIB_LIBRARY="%ZLIB_ROOT%\build\zlibstatic.lib" ^
             -DZLIB_INCLUDE_DIR="%ZLIB_ROOT%" ^
@@ -290,7 +291,7 @@ jobs:
 
       # ── 11. Deploy Qt runtime DLLs ───────────────────────────────────────
       - name: Deploy Qt (windeployqt)
-        working-directory: fritzing-app/release
+        working-directory: fritzing-app/release64
         run: windeployqt Fritzing.exe
         shell: cmd
 
@@ -299,5 +300,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fritzing-windows-x64
-          path: fritzing-app/release/
+          path: fritzing-app/release64/
           retention-days: 14
