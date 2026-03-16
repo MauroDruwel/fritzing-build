@@ -120,7 +120,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release ^
             -DBUILD_SHARED_LIBS=OFF ^
             -DUSE_BUNDLED_ZLIB=OFF ^
-            -DZLIB_LIBRARY="%ZLIB_ROOT%\build\zs.lib" ^
+            -DZLIB_LIBRARY="%ZLIB_ROOT%\build\zlibstatic.lib" ^
             -DZLIB_INCLUDE_DIR="%ZLIB_ROOT%" ^
             ..
           nmake
@@ -149,7 +149,7 @@ jobs:
           Push-Location build
           cmake -G "NMake Makefiles" `
             -DCMAKE_PREFIX_PATH="$QtPath" `
-            -DZLIB_LIBRARY="$ZlibRoot\build\zs.lib" `
+            -DZLIB_LIBRARY="$ZlibRoot\build\zlibstatic.lib" `
             -DZLIB_INCLUDE_DIR="$ZlibRoot" `
             -DCMAKE_BUILD_TYPE=Release ..
           nmake
@@ -193,9 +193,10 @@ jobs:
           }
 
           # Build clipper as a static library
-          Push-Location "Clipper1-6.4.2\include\polyclipping"
-          cl /c /EHsc /O2 /DNDEBUG clipper.cpp
-          lib /OUT:..\..\lib\polyclipping.lib clipper.obj
+          Push-Location "Clipper1-6.4.2"
+          cl /c /O2 /EHsc /MD /Iinclude\polyclipping include\polyclipping\clipper.cpp
+          lib /OUT:polyclipping.lib clipper.obj
+          Move-Item polyclipping.lib lib\
           Remove-Item clipper.obj -ErrorAction SilentlyContinue
           Pop-Location
 
