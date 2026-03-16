@@ -292,10 +292,39 @@ jobs:
           Copy-Item "fritzing-app\translations" "release64\" -Recurse -Force
         shell: pwsh
 
-      # ── 13. Upload build artifact ────────────────────────────────────────
+      # ── 13. Extract Version & Compress ───────────────────────────────────
+      - name: Extract Fritzing Version & Zip
+        run: |
+          $verFile = "fritzing-app\src\version\version.cpp"
+          $content = Get-Content -Raw -Path $verFile
+          $major = ([regex]'m_majorVersion\("(.*?)"\)').Match($content).Groups[1].Value
+          $minor = ([regex]'m_minorVersion\("(.*?)"\)').Match($content).Groups[1].Value
+          $patch = ([regex]'m_minorSubVersion\("(.*?)"\)').Match($content).Groups[1].Value
+          $mod = ([regex]'m_modifier\("(.*?)"\)').Match($content).Groups[1].Value
+          
+          $versionStr = "$major.$minor.$patch$mod"
+          echo "FRITZING_VER=$versionStr" >> $env:GITHUB_ENV
+          
+          $zipName = "Fritzing-$versionStr-Windows-x64.zip"
+          Compress-Archive -Path "release64\*" -DestinationPath $zipName
+          echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      # ── 14. Upload build artifact ────────────────────────────────────────
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fritzing-windows-x64
+          name: Fritzing-${{ env.FRITZING_VER }}-Windows-x64
           path: release64/
           retention-days: 14
+
+      # ── 15. Create GitHub Release ────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/master'
+        with:
+          tag_name: ${{ env.FRITZING_VER }}
+          name: "Fritzing ${{ env.FRITZING_VER }}"
+          files: ${{ env.ZIP_FILE }}
+          draft: true
+          generate_release_notes: false
