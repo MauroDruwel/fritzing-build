@@ -313,6 +313,7 @@ jobs:
       # ── 14. Compile Online Installer (Slim) ──────────────────────────────
       - name: Compile Online Setup (Downloads parts)
         run: |
+          Copy-Item "fritzing-build\fritzing_setup.iss" ".\" -Force
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=1 "fritzing_setup.iss"
           echo "ONLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OnlineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
