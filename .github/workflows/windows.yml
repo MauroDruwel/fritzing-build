@@ -286,7 +286,7 @@ jobs:
           Copy-Item "$env:QT_ROOT_DIR\bin\Qt6Core5Compat.dll" "release64\" -ErrorAction SilentlyContinue
 
           # Fritzing needs these folders alongside the .exe to run
-          Copy-Item "fritzing-parts" "release64\" -Recurse -Force
+          # (Note: fritzing-parts is purposefully omitted to shave 300MB; it will be downloaded by the setup)
           Copy-Item "fritzing-app\help" "release64\" -Recurse -Force
           Copy-Item "fritzing-app\sketches" "release64\" -Recurse -Force
           Copy-Item "fritzing-app\translations" "release64\" -Recurse -Force
@@ -310,21 +310,55 @@ jobs:
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 14. Upload build artifact ────────────────────────────────────────
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Fritzing-${{ env.FRITZING_VER }}-Windows-x64
-          path: release64/
-          retention-days: 14
+      # ── 14. Compile Online Installer (Slim) ──────────────────────────────
+      - name: Compile Online Setup (Downloads parts)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=1 "fritzing_setup.iss"
+          echo "ONLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OnlineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
+        shell: pwsh
 
-      # ── 15. Create GitHub Release ────────────────────────────────────────
+      # ── 15. Bundle fritzing-parts for Offline usage ──────────────────────
+      - name: Copy fritzing-parts into release64
+        run: |
+          # Remove the heavy .git folder before copying the parts database
+          if (Test-Path "fritzing-parts\.git") { Remove-Item "fritzing-parts\.git" -Recurse -Force }
+          # Now we copy the full database into release64 for the Offline Zip/Installer
+          Copy-Item "fritzing-parts" "release64\" -Recurse -Force
+        shell: pwsh
+
+      # ── 16. Compile Portable ZIP ─────────────────────────────────────────
+      - name: Compress Portable ZIP
+        run: |
+          $zipName = "Fritzing-$env:FRITZING_VER-Portable-Windows-x64.zip"
+          Compress-Archive -Path "release64\*" -DestinationPath $zipName
+          echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      # ── 17. Compile Offline Installer (Fat) ──────────────────────────────
+      - name: Compile Offline Setup (Bundled parts)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=0 "fritzing_setup.iss"
+          echo "OFFLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OfflineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      # ── 18. Upload build artifact ────────────────────────────────────────
+      # - name: Upload build artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Fritzing-${{ env.FRITZING_VER }}-Windows-x64
+      #     path: release64/
+      #     retention-days: 14
+
+      # ── 19. Create GitHub Release ────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/master'
         with:
           tag_name: ${{ env.FRITZING_VER }}
           name: "Fritzing ${{ env.FRITZING_VER }}"
-          files: ${{ env.ZIP_FILE }}
+          files: |
+            ${{ env.ZIP_FILE }}
+            ${{ env.ONLINE_SETUP_FILE }}
+            ${{ env.OFFLINE_SETUP_FILE }}
           draft: true
           generate_release_notes: false
