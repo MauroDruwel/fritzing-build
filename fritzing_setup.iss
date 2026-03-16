@@ -66,9 +66,13 @@ Filename: "{app}\Fritzing.exe"; Description: "{cm:LaunchProgram,Fritzing}"; Flag
 Type: filesandordirs; Name: "{app}\fritzing-parts"
 
 ; ──────────────────────────────────────────────────────────────────────────────
-; Online Installer: download and extract fritzing-parts during installation
+; Online Installer: clone fritzing-parts via git during installation
 ; ──────────────────────────────────────────────────────────────────────────────
 #if defined(OnlineInstaller) && OnlineInstaller == "1"
+#ifndef PartsDownloadUrl
+#define PartsDownloadUrl "https://github.com/fritzing/fritzing-parts/archive/refs/heads/master.zip"
+#endif
+
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
@@ -87,7 +91,7 @@ begin
   if CurPageID = wpReady then begin
     DownloadPage.Clear;
     DownloadPage.Add(
-      'https://github.com/fritzing/fritzing-parts/archive/refs/heads/master.zip',
+      '{#PartsDownloadUrl}',
       'fritzing-parts.zip', '');
     DownloadPage.Show;
     try
@@ -134,16 +138,20 @@ begin
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       // GitHub's archive names the folder 'fritzing-parts-master'; rename to 'fritzing-parts'
-      RenameFile(
-        ExpandConstant('{app}\fritzing-parts-master'),
-        ExpandConstant('{app}\fritzing-parts'));
-      Log('fritzing-parts extracted and renamed successfully.');
+      // Zips created manually will already extract to 'fritzing-parts'
+      if DirExists(ExpandConstant('{app}\fritzing-parts-master')) then
+      begin
+        RenameFile(
+          ExpandConstant('{app}\fritzing-parts-master'),
+          ExpandConstant('{app}\fritzing-parts'));
+      end;
+      Log('fritzing-parts extracted successfully.');
     end else begin
       Log('tar.exe failed with exit code: ' + IntToStr(ResultCode));
       SuppressibleMsgBox(
         'Failed to extract the parts database (tar exit code: ' + IntToStr(ResultCode) + ').' + #13#10 +
         'You can manually download and extract it from:' + #13#10 +
-        'https://github.com/fritzing/fritzing-parts',
+        '{#PartsDownloadUrl}',
         mbError, MB_OK, IDOK);
     end;
 

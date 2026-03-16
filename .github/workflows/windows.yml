@@ -311,19 +311,23 @@ jobs:
         shell: pwsh
 
       # ── 14. Compile Online Installer (Slim) ──────────────────────────────
+      - name: Zip fritzing-parts for Online Installer
+        run: |
+          Compress-Archive -Path "fritzing-parts" -DestinationPath "fritzing-parts.zip"
+        shell: pwsh
+
       - name: Compile Online Setup (Downloads parts)
         run: |
           Copy-Item "fritzing-build\fritzing_setup.iss" ".\" -Force
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=1 "fritzing_setup.iss"
+          $PartsUrl = "https://github.com/${{ github.repository }}/releases/download/$env:FRITZING_VER/fritzing-parts.zip"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=1 /dPartsDownloadUrl="$PartsUrl" "fritzing_setup.iss"
           echo "ONLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OnlineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
 
       # ── 15. Bundle fritzing-parts for Offline usage ──────────────────────
       - name: Copy fritzing-parts into release64
         run: |
-          # Remove the heavy .git folder before copying the parts database
-          if (Test-Path "fritzing-parts\.git") { Remove-Item "fritzing-parts\.git" -Recurse -Force }
-          # Now we copy the full database into release64 for the Offline Zip/Installer
+          # Copy the full database (including .git) into release64 for the Offline Zip/Installer
           Copy-Item "fritzing-parts" "release64\" -Recurse -Force
         shell: pwsh
 
@@ -361,5 +365,6 @@ jobs:
             ${{ env.ZIP_FILE }}
             ${{ env.ONLINE_SETUP_FILE }}
             ${{ env.OFFLINE_SETUP_FILE }}
+            fritzing-parts.zip
           draft: true
           token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
