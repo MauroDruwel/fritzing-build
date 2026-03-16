@@ -175,8 +175,7 @@ jobs:
       - name: Download and build Clipper
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
-          Invoke-WebRequest -Uri "https://sourceforge.net/projects/polyclipping/files/clipper_ver6.4.2.zip/download" `
-            -OutFile clipper.zip -UserAgent "Mozilla/5.0"
+          curl.exe -L -o clipper.zip "https://sourceforge.net/projects/polyclipping/files/clipper_ver6.4.2.zip/download"
           Expand-Archive -Path clipper.zip -DestinationPath clipper-src
           Remove-Item clipper.zip
 
@@ -225,8 +224,7 @@ jobs:
       - name: Download ngspice
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
-          Invoke-WebRequest -Uri "https://sourceforge.net/projects/ngspice/files/ng-spice-rework/old-releases/42/ngspice-42_dll_64.7z/download" `
-            -OutFile ngspice.7z -UserAgent "Mozilla/5.0"
+          curl.exe -L -o ngspice.7z "https://sourceforge.net/projects/ngspice/files/ng-spice-rework/old-releases/42/ngspice-42_dll_64.7z/download"
           7z x ngspice.7z -ongspice-extract
           # Move contents to expected location
           if (Test-Path "ngspice-extract\Spice64_dll") {
