@@ -178,10 +178,39 @@ jobs:
           sed -i.bak "s/QMAKE_APPLE_DEVICE_ARCHS = .*/QMAKE_APPLE_DEVICE_ARCHS = $ARCH/" phoenix.pro
           qmake phoenix.pro "CONFIG+=release"
 
+      # groundplanegenerator.cpp uses PdmDevicePixelRatioF_EncodedA/B and
+      # QPaintDevice::encodeMetricF() which were added in Qt 6.8. Guard them
+      # so the file still compiles against Qt 6.5.3.
+      - name: Patch source for Qt 6.5 compatibility
+        run: |
+          python3 - <<'PYEOF'
+          import re, pathlib
+          f = pathlib.Path("fritzing-app/src/svg/groundplanegenerator.cpp")
+          src = f.read_text()
+          # Guard the Qt >=6.8 enum cases
+          pattern = (
+              r"([ \t]*case PdmDevicePixelRatioF_EncodedA:\s*\n"
+              r"[ \t]*case PdmDevicePixelRatioF_EncodedB:\s*\n"
+              r"[ \t]*return QPaintDevice::encodeMetricF\(metric, 1\.0\);)"
+          )
+          replacement = (
+              "#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)\n"
+              r"\1"
+              "\n#endif"
+          )
+          patched, n = re.subn(pattern, replacement, src)
+          if n:
+              f.write_text(patched)
+              print(f"Patched {n} occurrence(s) in {f}")
+          else:
+              print("Pattern not found – no patch needed (already guarded or removed upstream)")
+          PYEOF
+
       - name: Build Fritzing (make)
         working-directory: fritzing-app
         run: |
           make release -j$(sysctl -n hw.ncpu) || make -j$(sysctl -n hw.ncpu)
+
 
       # ── 12. Bundle Third-Party Assets & Deploy Qt ─────────────────────────
       - name: Bundle Assets and Package App
