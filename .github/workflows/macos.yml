@@ -21,10 +21,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             arch: arm64
             name: Apple Silicon (ARM64)
-          - os: macos-15-intel
+          - os: macos-26-intel
             arch: x86_64
             name: Intel (x86_64)
 
