@@ -19,9 +19,9 @@ This repository uses GitHub Actions to compile Fritzing (`fritzing-app`) entirel
 2. **Offline Setup (`.exe`)**: An Inno Setup installer that tightly bundles the component database inside.
 3. **Online Setup (`.exe`)**: A lightweight installer that downloads the component database natively from GitHub during installation.
 
-### macOS (`macos-14`, Apple Silicon)
-1. **Disk Image (`.dmg`)**: A standalone macOS disk image containing `Fritzing.app` with Qt frameworks, dependencies, and component database bundled.
-2. **Portable Version (`.zip`)**: A zip archive containing `Fritzing.app`.
+### macOS (Apple Silicon `arm64` & Intel `x86_64`)
+1. **Apple Silicon (`arm64`, `macos-14`)**: Standalone `.dmg` disk image and portable `.zip` with Qt 6.8 LTS and components bundled for Apple Silicon (M1/M2/M3/M4).
+2. **Intel (`x86_64`, `macos-15-intel`)**: Standalone `.dmg` disk image and portable `.zip` with Qt 6.8 LTS and components bundled for Intel-based Macs.
 
 ### 📦 Dependencies Used for the Build
 
