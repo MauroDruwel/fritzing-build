@@ -12,10 +12,16 @@ If you use Fritzing and find it valuable for designing circuits and PCBs, **plea
 
 ## 🚀 Build Overview
 
-This repository uses GitHub Actions (`windows-2022` runner) to compile Fritzing (`fritzing-app`) entirely from source alongside its component repository (`fritzing-parts`). It generates three distinct release artifacts:
+This repository uses GitHub Actions to compile Fritzing (`fritzing-app`) entirely from source alongside its component repository (`fritzing-parts`).
+
+### Windows (`windows-2022`)
 1. **Portable Version (`.zip`)**: A fully self-contained directory containing Fritzing and its 300MB component database.
 2. **Offline Setup (`.exe`)**: An Inno Setup installer that tightly bundles the component database inside.
 3. **Online Setup (`.exe`)**: A lightweight installer that downloads the component database natively from GitHub during installation.
+
+### macOS (`macos-14`, Apple Silicon)
+1. **Disk Image (`.dmg`)**: A standalone macOS disk image containing `Fritzing.app` with Qt frameworks, dependencies, and component database bundled.
+2. **Portable Version (`.zip`)**: A zip archive containing `Fritzing.app`.
 
 ### 📦 Dependencies Used for the Build
 
