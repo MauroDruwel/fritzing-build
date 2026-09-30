@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  QT_VERSION: '6.5.3'
+  QT_VERSION: '6.8.2'
 
 permissions:
   contents: write
@@ -66,9 +66,9 @@ jobs:
             boost_1_85_0
             svgpp-1.3.1
             ngspice-42
-          key: macos-deps-v2-${{ env.QT_VERSION }}-${{ runner.arch }}
+          key: macos-deps-v3-${{ env.QT_VERSION }}-${{ runner.arch }}
 
-      # ── 4. Build libgit2 (Static) ─────────────────────────────────────────
+      # ── 4. Build libgit2 (Static ARM64) ───────────────────────────────────
       - name: Build libgit2
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -80,14 +80,15 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DUSE_SSH=OFF \
             -DUSE_NTLMCLIENT=OFF \
-            -DUSE_BUNDLED_ZLIB=ON
+            -DUSE_BUNDLED_ZLIB=ON \
+            -DCMAKE_OSX_ARCHITECTURES=arm64
           cmake --build build -j$(sysctl -n hw.ncpu)
           mkdir -p lib
           find build -name "libgit2.a" -exec cp {} lib/libgit2.a \;
           cd ..
           ln -sfn libgit2-1.7.1 libgit2 2>/dev/null || true
 
-      # ── 5. Build QuaZip ───────────────────────────────────────────────────
+      # ── 5. Build QuaZip (ARM64) ───────────────────────────────────────────
       - name: Build QuaZip
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -97,7 +98,8 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
-            -DQUAZIP_QT_MAJOR_VERSION=6
+            -DQUAZIP_QT_MAJOR_VERSION=6 \
+            -DCMAKE_OSX_ARCHITECTURES=arm64
           cmake --build build -j$(sysctl -n hw.ncpu)
           cd ..
 
@@ -109,7 +111,7 @@ jobs:
           cp quazip-1.4/quazip/*.h "$TARGET_DIR/include/QuaZip-Qt6-1.4/"
           cp quazip-1.4/quazip/*.h "$TARGET_DIR/include/QuaZip-Qt6-1.4/quazip/"
 
-      # ── 6. Build Clipper ──────────────────────────────────────────────────
+      # ── 6. Build Clipper (ARM64) ──────────────────────────────────────────
       - name: Download and build Clipper
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -122,7 +124,7 @@ jobs:
           cp "$HPP_FILE" Clipper1-6.4.2/include/polyclipping/
           cp "$HPP_FILE" Clipper1-6.4.2/include/
 
-          clang++ -O3 -fPIC -c "$CPP_FILE" -I Clipper1-6.4.2/include/polyclipping -o clipper.o
+          clang++ -arch arm64 -O3 -fPIC -c "$CPP_FILE" -I Clipper1-6.4.2/include/polyclipping -o clipper.o
           ar rcs Clipper1-6.4.2/lib/libpolyclipping.a clipper.o
           rm -rf clipper.o clipper-src clipper.zip
 
