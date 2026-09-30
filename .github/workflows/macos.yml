@@ -51,7 +51,7 @@ jobs:
           host: 'mac'
           target: 'desktop'
           arch: 'clang_64'
-          modules: 'qtserialport qt5compat qtsvg'
+          modules: 'qtserialport qt5compat'
           cache: true
 
       # ── 3. Cache built dependencies ───────────────────────────────────────
