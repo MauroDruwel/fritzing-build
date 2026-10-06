@@ -23,7 +23,7 @@ To compile Fritzing successfully from source, this build script pulls and links 
 
 - [**Fritzing App**](https://github.com/fritzing/fritzing-app) - The core IDE and Application.
 - [**Fritzing Parts**](https://github.com/fritzing/fritzing-parts) - The database of electronic components and SVGs.
-- [**Qt 6.5.3**](https://www.qt.io/) - Cross-platform application framework (utilizing `qtbase`, `qtsvg`, `qtserialport`, `qt5compat`, and `qttools`).
+- [**Qt 6.8.3**](https://www.qt.io/) - Cross-platform application framework (utilizing `qtbase`, `qtsvg`, `qtserialport`, `qt5compat`, and `qttools`).
 - [**libgit2 (1.7.1)**](https://github.com/libgit2/libgit2) - Portable C implementation of Git core methods utilized for parts database synchronization.
 - [**QuaZip (1.4intuisphere)**](https://github.com/stachenov/quazip) - C++ wrapper for ZIP operations utilizing Qt.
 - [**ngspice (v42)**](https://sourceforge.net/projects/ngspice/) - The open-source spice simulator used for circuit simulations.
