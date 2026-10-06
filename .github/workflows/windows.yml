@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      # ── 0. Checkout repositories ──────────────────────────────────────────
+      # Checkout repositories
       - name: Checkout fritzing-build
         uses: actions/checkout@v4
         with:
@@ -32,13 +32,13 @@ jobs:
           repository: fritzing/fritzing-parts
           path: fritzing-parts
 
-      # ── 1. Setup MSVC 2022 environment ────────────────────────────────────
+      # Setup MSVC 2022 environment
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64
 
-      # ── 2. Install Qt ────────────────────────────────────────────────────
+      # Install Qt
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -49,23 +49,23 @@ jobs:
           modules: 'qtserialport qt5compat'
           cache: true
 
-      # ── 3. Cache built dependencies ──────────────────────────────────────
+      # Cache built dependencies
       - name: Cache dependencies
         id: deps-cache
         uses: actions/cache@v4
         with:
           path: |
             zlib
-            libgit2
+            libgit2-1.7.1
             quazip-1.4
             quazip-${{ env.QT_VERSION }}-1.4intuisphere
             Clipper1-6.4.2
             boost_1_85_0
             svgpp-1.3.1
             ngspice-42
-          key: deps-manual-v1-${{ runner.os }}
+          key: deps-manual-v2-${{ runner.os }}
 
-      # ── 4. Build ZLib ─────────────────────────────────────────────────────
+      # Build ZLib
       - name: Download ZLib
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -87,15 +87,16 @@ jobs:
           copy zconf.h ..
         shell: cmd
 
-      # ── 5. Build libgit2 ──────────────────────────────────────────────────
+      # Build libgit2
+      # fritzing-app (pri/libgit2detect.pri) expects libgit2-1.7.1/include and libgit2-1.7.1/lib/git2.lib
       - name: Clone libgit2
         if: steps.deps-cache.outputs.cache-hit != 'true'
-        run: git clone --depth 1 https://github.com/libgit2/libgit2.git libgit2
+        run: git clone --depth 1 --branch v1.7.1 https://github.com/libgit2/libgit2.git libgit2-1.7.1
         shell: bash
 
       - name: Build libgit2
         if: steps.deps-cache.outputs.cache-hit != 'true'
-        working-directory: libgit2
+        working-directory: libgit2-1.7.1
         run: |
           set ZLIB_ROOT=%GITHUB_WORKSPACE%\zlib
           mkdir build64
@@ -109,11 +110,11 @@ jobs:
             -DZLIB_INCLUDE_DIR="%ZLIB_ROOT%" ^
             ..
           nmake
-          mkdir Release
-          copy git2.lib Release\
+          mkdir ..\lib
+          copy git2.lib ..\lib\
         shell: cmd
 
-      # ── 6. Build QuaZip ───────────────────────────────────────────────────
+      # Build QuaZip
       - name: Download QuaZip
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -154,7 +155,7 @@ jobs:
           Copy-Item "quazip-1.4\quazip\*.h" "$QuazipSibling\include\QuaZip-Qt6-1.4\quazip\"
         shell: pwsh
 
-      # ── 7. Setup Clipper ──────────────────────────────────────────────────
+      # Setup Clipper
       - name: Download and build Clipper
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -185,7 +186,7 @@ jobs:
           Remove-Item "clipper-src" -Recurse -Force -ErrorAction SilentlyContinue
         shell: pwsh
 
-      # ── 8. Download header-only and pre-built dependencies ────────────────
+      # Download header-only and pre-built dependencies
       - name: Download Boost
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: |
@@ -221,13 +222,13 @@ jobs:
           Remove-Item ngspice-extract -Recurse -Force -ErrorAction SilentlyContinue
         shell: pwsh
 
-      # ── 9. Verify directory structure ─────────────────────────────────────
+      # Verify directory structure
       - name: Verify dependency layout
         run: |
           echo "=== Directory Structure ==="
           echo "--- libgit2 ---"
-          Get-ChildItem "libgit2\include\git2.h" -ErrorAction SilentlyContinue
-          Get-ChildItem "libgit2\build64\Release\git2.lib" -ErrorAction SilentlyContinue
+          Get-ChildItem "libgit2-1.7.1\include\git2.h" -ErrorAction SilentlyContinue
+          Get-ChildItem "libgit2-1.7.1\lib\git2.lib" -ErrorAction SilentlyContinue
           echo "--- QuaZip ---"
           $qz = "quazip-${{ env.QT_VERSION }}-1.4intuisphere"
           Get-ChildItem "$qz\lib\*" -ErrorAction SilentlyContinue
@@ -243,7 +244,7 @@ jobs:
           Test-Path "ngspice-42\include"
         shell: pwsh
 
-      # ── 10. Configure Fritzing (qmake) ───────────────────────────────────
+      # Configure Fritzing (qmake)
       - name: Clean qmake cache
         working-directory: fritzing-app
         run: |
@@ -271,13 +272,13 @@ jobs:
         run: nmake release
         shell: cmd
 
-      # ── 11. Deploy Qt runtime DLLs ───────────────────────────────────────
+      # Deploy Qt runtime DLLs
       - name: Deploy Qt (windeployqt)
         working-directory: release64
         run: windeployqt Fritzing.exe
         shell: cmd
 
-      # ── 12. Copy Third-Party DLLs & Runtime Data ──────────────────────────
+      # Copy Third-Party DLLs & Runtime Data
       - name: Copy third-party DLLs and data folders
         run: |
           # Copy extra DLLs
@@ -292,7 +293,7 @@ jobs:
           Copy-Item "fritzing-app\translations" "release64\" -Recurse -Force
         shell: pwsh
 
-      # ── 13. Extract Version & Compress ───────────────────────────────────
+      # Extract Version & Compress
       - name: Extract Fritzing Version & Zip
         run: |
           $verFile = "fritzing-app\src\version\version.cpp"
@@ -310,7 +311,7 @@ jobs:
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 14. Prepare fritzing-parts (clone + pre-built parts.db) ──────────
+      # Prepare fritzing-parts (clone + pre-built parts.db)
       - name: Clone fritzing-parts
         run: |
           # Clone from local checkout → guarantees a proper .git, no re-download
@@ -340,7 +341,7 @@ jobs:
           echo "parts.db: $((Get-Item $db).Length / 1MB) MB"
         shell: pwsh
 
-      # ── 15. Compile Online Installer (Slim) ──────────────────────────────
+      # Compile Online Installer (Slim)
       - name: Zip fritzing-parts for Online Installer
         run: |
           Push-Location fritzing-parts-zip
@@ -356,12 +357,12 @@ jobs:
           echo "ONLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OnlineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 16. Bundle fritzing-parts for Offline usage ──────────────────────
+      # Bundle fritzing-parts for Offline usage
       - name: Move fritzing-parts into release64
         run: Move-Item "fritzing-parts-zip\fritzing-parts" "release64\fritzing-parts"
         shell: pwsh
 
-      # ── 17. Compile Portable ZIP ─────────────────────────────────────────
+      # Compile Portable ZIP
       - name: Compress Portable ZIP
         run: |
           $zipName = "Fritzing-$env:FRITZING_VER-Portable-Windows-x64.zip"
@@ -371,14 +372,14 @@ jobs:
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 18. Compile Offline Installer (Fat) ──────────────────────────────
+      # Compile Offline Installer (Fat)
       - name: Compile Offline Setup (Bundled parts)
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=0 "fritzing_setup.iss"
           echo "OFFLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OfflineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 19. Create GitHub Release ────────────────────────────────────────
+      # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/master'

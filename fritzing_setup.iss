@@ -1,9 +1,7 @@
-; ──────────────────────────────────────────────────────────────────────────────
 ; Fritzing Installer Script for Inno Setup 6.1+
 ; Supports two modes via /dOnlineInstaller="1" or /dOnlineInstaller="0":
 ;   Online  – lightweight setup, downloads fritzing-parts during install
 ;   Offline – bundles fritzing-parts inside the setup executable
-; ──────────────────────────────────────────────────────────────────────────────
 
 [Setup]
 ; NOTE: AppId uniquely identifies this application. Do not use the same AppId
@@ -70,9 +68,7 @@ Filename: "{app}\Fritzing.exe"; Description: "{cm:LaunchProgram,Fritzing}"; Flag
 ; so Inno Setup's uninstaller does not track those files automatically)
 Type: filesandordirs; Name: "{app}\fritzing-parts"
 
-; ──────────────────────────────────────────────────────────────────────────────
-; Online Installer: clone fritzing-parts via git during installation
-; ──────────────────────────────────────────────────────────────────────────────
+; Online Installer: download and extract fritzing-parts during installation
 #if defined(OnlineInstaller) && OnlineInstaller == "1"
 #ifndef PartsDownloadUrl
 #define PartsDownloadUrl "https://github.com/fritzing/fritzing-parts/archive/refs/heads/master.zip"
