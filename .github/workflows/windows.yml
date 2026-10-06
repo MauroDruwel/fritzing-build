@@ -310,17 +310,42 @@ jobs:
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 14. Compile Online Installer (Slim) ──────────────────────────────
-      - name: Zip fritzing-parts for Online Installer
+      # ── 14. Prepare fritzing-parts (clone + pre-built parts.db) ──────────
+      - name: Clone fritzing-parts
         run: |
           # Clone from local checkout → guarantees a proper .git, no re-download
           git clone --no-hardlinks fritzing-parts fritzing-parts-zip/fritzing-parts
           # Fix remote URL: local clone points origin to CI-local path; must point to GitHub
           git -C fritzing-parts-zip/fritzing-parts remote set-url origin https://github.com/fritzing/fritzing-parts.git
+        shell: bash
+
+      # Without parts.db, Fritzing regenerates it on first launch: that needs write access
+      # to the install dir (Program Files is read-only for normal users) and a git repo
+      # libgit2 accepts (ownership checks fail for files extracted by an elevated installer).
+      # Either failure shows "Unable to find parts git repository" and an empty parts bin.
+      # Build the database here so first launch just loads it.
+      - name: Build parts.db
+        run: |
+          $parts = Join-Path $env:GITHUB_WORKSPACE "fritzing-parts-zip\fritzing-parts"
+          $db = Join-Path $parts "parts.db"
+          $proc = Start-Process -FilePath (Join-Path $env:GITHUB_WORKSPACE "release64\Fritzing.exe") `
+            -ArgumentList "-pp", "`"$parts`"", "-db", "`"$db`"" -PassThru
+          if (-not $proc.WaitForExit(900000)) {
+            $proc.Kill()
+            throw "Timed out generating parts.db"
+          }
+          if (-not (Test-Path $db) -or (Get-Item $db).Length -lt 1MB) {
+            throw "parts.db was not generated (exit code $($proc.ExitCode))"
+          }
+          echo "parts.db: $((Get-Item $db).Length / 1MB) MB"
+        shell: pwsh
+
+      # ── 15. Compile Online Installer (Slim) ──────────────────────────────
+      - name: Zip fritzing-parts for Online Installer
+        run: |
           Push-Location fritzing-parts-zip
           7z a -tzip ..\fritzing-parts.zip fritzing-parts
           Pop-Location
-          Remove-Item fritzing-parts-zip -Recurse -Force
         shell: pwsh
 
       - name: Compile Online Setup (Downloads parts)
@@ -331,16 +356,12 @@ jobs:
           echo "ONLINE_SETUP_FILE=Fritzing-$env:FRITZING_VER-OnlineSetup-Windows-x64.exe" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 15. Bundle fritzing-parts for Offline usage ──────────────────────
-      - name: Clone fritzing-parts into release64
-        run: |
-          # Clone from local checkout → guarantees a proper .git, no re-download
-          git clone --no-hardlinks fritzing-parts release64/fritzing-parts
-          # Fix remote URL: local clone points origin to CI-local path; must point to GitHub
-          git -C release64/fritzing-parts remote set-url origin https://github.com/fritzing/fritzing-parts.git
-        shell: bash
+      # ── 16. Bundle fritzing-parts for Offline usage ──────────────────────
+      - name: Move fritzing-parts into release64
+        run: Move-Item "fritzing-parts-zip\fritzing-parts" "release64\fritzing-parts"
+        shell: pwsh
 
-      # ── 16. Compile Portable ZIP ─────────────────────────────────────────
+      # ── 17. Compile Portable ZIP ─────────────────────────────────────────
       - name: Compress Portable ZIP
         run: |
           $zipName = "Fritzing-$env:FRITZING_VER-Portable-Windows-x64.zip"
@@ -350,7 +371,7 @@ jobs:
           echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
         shell: pwsh
 
-      # ── 17. Compile Offline Installer (Fat) ──────────────────────────────
+      # ── 18. Compile Offline Installer (Fat) ──────────────────────────────
       - name: Compile Offline Setup (Bundled parts)
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /dMyAppVersion="$env:FRITZING_VER" /dOnlineInstaller=0 "fritzing_setup.iss"

@@ -53,6 +53,11 @@ Root: HKA; Subkey: "Software\Classes\FritzingPart\shell\open\command"; ValueType
 ; Bundle everything inside release64 (Online = no parts, Offline = with parts)
 Source: "release64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Dirs]
+; Fritzing updates the parts repo and can rewrite parts.db at runtime, which a
+; non-admin user can't do under Program Files. Files created inside inherit this ACL.
+Name: "{app}\fritzing-parts"; Permissions: users-modify
+
 [Icons]
 Name: "{group}\Fritzing"; Filename: "{app}\Fritzing.exe"
 Name: "{autodesktop}\Fritzing"; Filename: "{app}\Fritzing.exe"; Tasks: desktopicon
